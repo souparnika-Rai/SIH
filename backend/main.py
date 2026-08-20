@@ -11,7 +11,7 @@ from google import genai
 from PIL import Image
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 app = FastAPI(title="Infrastructure Defect Detection API")
 
@@ -118,8 +118,15 @@ async def analyze_image(
             severity = data.get("severity", "Medium")
             priority_score = int(data.get("priority", 50))
         except Exception as e:
+            import traceback
+            traceback.print_exc()
+            try:
+                with open("error_log.txt", "w") as f:
+                    f.write(traceback.format_exc())
+            except:
+                pass
             print("Gemini API Error:", e)
-            defect = "Error: Invalid API Key or Gemini API failure"
+            defect = f"API Error: {str(e)}"
             confidence = "0%"
             severity = "Unknown"
             priority_score = 0

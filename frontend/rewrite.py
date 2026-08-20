@@ -1,134 +1,38 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Camera, MapPin, Upload, CheckCircle, XCircle, Info, User, Phone, Star, Search, List, ChevronLeft } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useTranslation } from 'react-i18next';
-import Map, { Marker } from 'react-map-gl/maplibre';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import sys
+import re
 
-export default function CitizenApp() {
-  const { t } = useTranslation();
+with open('src/pages/CitizenApp.jsx', 'r', encoding='utf-8') as f:
+    content = f.read()
 
-  const [image, setImage] = useState(null);
-  const [location, setLocation] = useState(null);
-  const [placeName, setPlaceName] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [citizenName, setCitizenName] = useState("");
-  const [citizenContact, setCitizenContact] = useState("");
-  const [citizenNotes, setCitizenNotes] = useState("");
-  
-  const [rawFile, setRawFile] = useState(null);
-  const [activeIssue, setActiveIssue] = useState(null);
-  const [toast, setToast] = useState(null);
-  const [citizenRating, setCitizenRating] = useState(0);
-
-  const [myReportsList, setMyReportsList] = useState([]);
-  
-  const videoRef = useRef(null);
-  const mapRef = useRef(null);
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
-
-  const handleNewIssue = () => {
-    setActiveIssue(null);
-    setImage(null);
-    setRawFile(null);
-    setLocation(null);
-    setPlaceName("");
-    setCitizenNotes("");
-  };
-
-  // Cleanup camera on unmount
-  useEffect(() => {
-    return () => stopCamera();
-  }, []);
-
-  const fetchPlaceName = async (lat, lng) => {
-    try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-      const data = await res.json();
-      if (data && data.display_name) {
-        setPlaceName(data.display_name);
-      }
-    } catch (e) {
-      console.error("Geocoding error:", e);
-    }
-  };
-
-  const fetchCoordinates = async (address) => {
-    if (!address) return;
-    try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
-      const data = await res.json();
-      if (data && data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lng = parseFloat(data[0].lon);
-        setLocation({ lat, lng });
-        if (mapRef.current) {
-          mapRef.current.flyTo({ center: [lng, lat], zoom: 14 });
+old_use_effect = """  useEffect(() => {
+    let interval;
+    if (activeIssue && activeIssue.status !== 'Resolved' && activeIssue.status !== 'Declined') {
+      interval = setInterval(async () => {
+        try {
+          const res = await fetch("http://127.0.0.1:8000/issues");
+          if (!res.ok) return;
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            const updated = data.find(i => i.id === activeIssue.id);
+            if (updated) setActiveIssue(updated);
+          }
+        } catch (e) {
+          console.error(e);
         }
-      }
-    } catch (e) {
-      console.error("Geocoding error:", e);
+      }, 3000);
     }
-  };
+    return () => clearInterval(interval);
+  }, [activeIssue]);"""
 
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      setIsCameraOpen(true);
-      setTimeout(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      }, 100);
-    } catch (err) {
-      console.error("Camera access error:", err);
-      alert("Could not access camera. Please check permissions.");
-    }
-  };
-
-  const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-    }
-    setIsCameraOpen(false);
-  };
-
-  const takePhoto = () => {
-    if (videoRef.current) {
-      const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      canvas.getContext('2d').drawImage(videoRef.current, 0, 0);
-      
-      canvas.toBlob((blob) => {
-        const file = new File([blob], "camera_capture.jpg", { type: "image/jpeg" });
-        setRawFile(file);
-        setImage(URL.createObjectURL(blob));
-        stopCamera();
-        
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-              fetchPlaceName(pos.coords.latitude, pos.coords.longitude);
-            },
-            (err) => console.error(err)
-          );
-        }
-      }, 'image/jpeg');
-    }
-  };
-
-  useEffect(() => {
-    let isActive = true;
+new_use_effect = """  useEffect(() => {
     let interval;
     const pollData = async () => {
       try {
         const saved = JSON.parse(localStorage.getItem('my_reports') || '[]');
         const res = await fetch("http://127.0.0.1:8000/issues");
-        if (!res.ok || !isActive) return;
+        if (!res.ok) return;
         const data = await res.json();
-        if (Array.isArray(data) && isActive) {
+        if (Array.isArray(data)) {
           const filtered = data.filter(i => saved.includes(i.id));
           setMyReportsList(filtered);
           
@@ -143,109 +47,21 @@ export default function CitizenApp() {
     };
     pollData();
     interval = setInterval(pollData, 3000);
-    return () => {
-      isActive = false;
-      clearInterval(interval);
-    };
-  }, [activeIssue]);
+    return () => clearInterval(interval);
+  }, [activeIssue]);"""
 
-  const getLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-          fetchPlaceName(position.coords.latitude, position.coords.longitude);
-        },
-        (error) => {
-          console.error("Error getting location:", error);
-          alert("Please enable location services to tag this issue.");
-          // Fallback to Sullia
-          setLocation({ lat: 12.5566, lng: 75.3855 });
-          fetchPlaceName(12.5566, 75.3855);
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    } else {
-      // Fallback to Sullia
-      setLocation({ lat: 12.5566, lng: 75.3855 });
-      fetchPlaceName(12.5566, 75.3855);
-    }
-  };
+content = content.replace(old_use_effect, new_use_effect)
 
-  const handleCapture = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setRawFile(file);
-      setImage(URL.createObjectURL(file));
-      getLocation();
-    }
-  };
+content = re.sub(r'  const handleShowMyReports = async \(\) => \{.*?\n  \};\n', '', content, flags=re.DOTALL)
 
+return_start = content.find('  return (\n    <div className="max-w-md mx-auto')
+if return_start == -1:
+    print('Could not find return statement')
+    sys.exit(1)
 
-  const submitIssue = async () => {
-    if (!location) {
-      alert(t('location_required') || 'Location is required');
-      return;
-    }
-    if (citizenContact && citizenContact.length !== 10) {
-      alert("Contact number must be exactly 10 digits");
-      return;
-    }
-    setIsSubmitting(true);
+before_return = content[:return_start]
 
-    const formData = new FormData();
-    formData.append("image", rawFile);
-    formData.append("latitude", location.lat.toString());
-    formData.append("longitude", location.lng.toString());
-    formData.append("citizen_name", citizenName || "Anonymous");
-    formData.append("citizen_contact", citizenContact || "N/A");
-    formData.append("citizen_notes", citizenNotes || "");
-    formData.append("place_name", placeName || "");
-
-    try {
-      const response = await fetch("http://127.0.0.1:8000/analyze", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await response.json();
-      const saved = JSON.parse(localStorage.getItem('my_reports') || '[]');
-      if (!saved.includes(data.id)) {
-        localStorage.setItem('my_reports', JSON.stringify([...saved, data.id]));
-      }
-      setActiveIssue(data);
-      setToast("Report sent successfully!");
-      setTimeout(() => setToast(null), 3000);
-    } catch (error) {
-      console.error("Error submitting issue:", error);
-      alert("Failed to connect to the backend server.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const updateStatus = async (newStatus) => {
-    try {
-      await fetch(`http://127.0.0.1:8000/issues/${activeIssue.id}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          status: newStatus,
-          citizen_rating: citizenRating > 0 ? citizenRating : undefined
-        }),
-      });
-      setActiveIssue(prev => ({ ...prev, status: newStatus }));
-      setToast(t('issue_closed_success') || 'Status updated!');
-      setTimeout(() => setToast(null), 3000);
-    } catch (e) {
-      console.error(e);
-      alert("Failed to update status.");
-    }
-  };
-
-  return (
+new_return = """  return (
     <div className="flex h-[calc(100vh-64px)] bg-gray-50 overflow-hidden relative">
       <AnimatePresence>
         {toast && (
@@ -267,7 +83,7 @@ export default function CitizenApp() {
             <h2 className="font-extrabold text-gray-900 text-lg tracking-tight">My Reports</h2>
             <p className="text-xs text-gray-500 mt-1">Track your submitted issues</p>
           </div>
-          <button onClick={handleNewIssue} className="text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm transition-colors">
+          <button onClick={() => setActiveIssue(null)} className="text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm transition-colors">
             + New
           </button>
         </div>
@@ -374,81 +190,25 @@ export default function CitizenApp() {
                       <Phone className="h-5 w-5" />
                     </div>
                     <input
-                      type="tel"
-                      maxLength="10"
-                      pattern="\d{10}"
-                      placeholder="Contact Number (10 digits)"
+                      type="text"
+                      placeholder="Contact Number (Optional)"
                       value={citizenContact}
-                      onChange={(e) => setCitizenContact(e.target.value.replace(/\D/g, ''))}
+                      onChange={(e) => setCitizenContact(e.target.value)}
                       className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
-                    />
-                  </div>
-                  <div className="relative">
-                    <textarea
-                      placeholder="Describe the problem clearly (Notes)"
-                      value={citizenNotes}
-                      onChange={(e) => setCitizenNotes(e.target.value)}
-                      rows={3}
-                      className="block w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all resize-none"
                     />
                   </div>
                 </div>
 
-                <div className="flex flex-col items-start gap-3 p-4 bg-gray-50 rounded-2xl">
-                  <div className="flex items-start gap-3 w-full">
-                    <div className={`p-2 mt-1 rounded-full ${location ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-500'}`}>
-                      <MapPin className="w-5 h-5" />
-                    </div>
-                    <div className="flex-1 w-full">
-                      <p className="text-sm font-bold text-gray-900 mb-1">{t('location')} (Drag pin to adjust)</p>
-                      <textarea 
-                        value={placeName || (location ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : '')}
-                        onChange={(e) => setPlaceName(e.target.value)}
-                        onBlur={(e) => fetchCoordinates(e.target.value)}
-                        placeholder={t('waiting_for_gps') || 'Waiting for GPS...'}
-                        className="w-full text-xs text-gray-700 bg-white border border-gray-200 rounded-lg p-2 focus:ring-1 focus:ring-blue-500 outline-none resize-none"
-                        rows={2}
-                      />
-                    </div>
+                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl">
+                  <div className={`p-2 rounded-full ${location ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-500'}`}>
+                    <MapPin className="w-5 h-5" />
                   </div>
-                  {location && (
-                    <div className="w-full h-40 rounded-xl overflow-hidden border relative z-0">
-                      <Map
-                        ref={mapRef}
-                        initialViewState={{
-                          longitude: location.lng,
-                          latitude: location.lat,
-                          zoom: 12
-                        }}
-                        mapStyle={{
-                          version: 8,
-                          sources: {
-                            osm: {
-                              type: 'raster',
-                              tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
-                              tileSize: 256,
-                              attribution: '&copy; OpenStreetMap'
-                            }
-                          },
-                          layers: [{ id: 'osm', type: 'raster', source: 'osm', minzoom: 0, maxzoom: 19 }]
-                        }}
-                      >
-                        <Marker 
-                          longitude={location.lng} 
-                          latitude={location.lat} 
-                          draggable
-                          onDragEnd={(e) => {
-                            setLocation({ lat: e.lngLat.lat, lng: e.lngLat.lng });
-                            fetchPlaceName(e.lngLat.lat, e.lngLat.lng);
-                          }}
-                        >
-                          <div className="relative">
-                            <MapPin className="w-8 h-8 text-red-500 drop-shadow-md -mt-8" fill="white" />
-                          </div>
-                        </Marker>
-                      </Map>
-                    </div>
-                  )}
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-gray-900">{t('location')}</p>
+                    <p className="text-xs text-gray-500 line-clamp-2">
+                      {placeName ? placeName : location ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : t('waiting_for_gps')}
+                    </p>
+                  </div>
                 </div>
 
                 <button
@@ -563,3 +323,9 @@ export default function CitizenApp() {
     </div>
   );
 }
+"""
+
+with open('src/pages/CitizenApp.jsx', 'w', encoding='utf-8') as f:
+    f.write(before_return + new_return)
+
+print("Updated CitizenApp.jsx")

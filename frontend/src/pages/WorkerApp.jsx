@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, MapPin, CheckCircle, Navigation, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 export default function WorkerApp() {
+  const { t } = useTranslation();
   const [image, setImage] = useState(null);
+  const [base64Image, setBase64Image] = useState(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [task, setTask] = useState(null);
 
@@ -32,6 +35,11 @@ export default function WorkerApp() {
     const file = e.target.files[0];
     if (file) {
       setImage(URL.createObjectURL(file));
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setBase64Image(reader.result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -41,7 +49,10 @@ export default function WorkerApp() {
       await fetch(`http://127.0.0.1:8000/issues/${task.id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus, worker_image: workerImage }),
+        body: JSON.stringify({ 
+          status: newStatus, 
+          worker_image: workerImage
+        }),
       });
       setTask({ ...task, status: newStatus });
     } catch (err) {
@@ -56,12 +67,12 @@ export default function WorkerApp() {
   const verifyRepair = () => {
     setIsVerifying(true);
     setTimeout(() => {
-      // Mock worker image
-      const mockRepairedImage = "https://images.unsplash.com/photo-1590740924976-189f3a6963c6?auto=format&fit=crop&q=80&w=400";
-      updateTaskStatus('Completed', mockRepairedImage);
+      const finalImage = base64Image || "https://images.unsplash.com/photo-1590740924976-189f3a6963c6?auto=format&fit=crop&q=80&w=400";
+      updateTaskStatus('Completed', finalImage);
       setIsVerifying(false);
       setImage(null);
-    }, 2000);
+      setBase64Image(null);
+    }, 1000);
   };
 
   if (!task) {
@@ -77,14 +88,14 @@ export default function WorkerApp() {
   return (
     <div className="max-w-md mx-auto w-full p-6 pt-12 space-y-6">
       <div className="text-center mb-6">
-        <h1 className="text-2xl font-extrabold text-gray-900">Task Assigned</h1>
-        <p className="text-gray-500 text-sm">You have a new maintenance task.</p>
+        <h1 className="text-2xl font-extrabold text-gray-900">{t('worker_title')}</h1>
+        <p className="text-gray-500 text-sm">{t('worker_subtitle')}</p>
       </div>
 
       <div className="bg-red-50 border border-red-100 rounded-3xl p-6 shadow-sm">
         <div className="flex justify-between items-start mb-2">
-          <h2 className="font-extrabold text-red-700 text-lg">{task.type}</h2>
-          <span className="bg-red-600 text-white text-[10px] uppercase px-2 py-1 rounded font-bold">{task.severity}</span>
+          <h2 className="font-extrabold text-red-700 text-lg">{t(task.type.toLowerCase().replace(' ', '_')) || task.type}</h2>
+          <span className="bg-red-600 text-white text-[10px] uppercase px-2 py-1 rounded font-bold">{t(task.severity.toLowerCase()) || task.severity}</span>
         </div>
         
         <div className="flex items-center gap-2 text-red-900/80 text-sm mb-6 font-medium">
@@ -93,12 +104,15 @@ export default function WorkerApp() {
 
         {task.status === 'Assigning' ? (
           <button onClick={acceptWork} className="w-full py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-lg shadow-yellow-500/20">
-            Accept Work
+            {t('accept_task')}
           </button>
         ) : task.status === 'Assigned' ? (
           <div className="space-y-3">
-            <button className="w-full py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-transform active:scale-95">
-              <Navigation className="w-4 h-4" /> Navigate to Site
+            <button 
+              onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${task.lat},${task.lng}`, '_blank')}
+              className="w-full py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-transform active:scale-95"
+            >
+              <Navigation className="w-4 h-4" /> {t('navigate_site')}
             </button>
           </div>
         ) : task.status === 'Completed' ? (
@@ -113,8 +127,8 @@ export default function WorkerApp() {
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-3xl shadow-sm border p-6 space-y-4"
         >
-          <h3 className="font-bold text-gray-800 border-b pb-2">Verification (After Repair)</h3>
-          <p className="text-xs text-gray-500">Capture the repaired infrastructure. The citizen and AI will verify the fix.</p>
+          <h3 className="font-bold text-gray-800 border-b pb-2">{t('verification_title')}</h3>
+          <p className="text-xs text-gray-500">{t('verification_desc')}</p>
           
           <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-2xl cursor-pointer hover:bg-gray-50 transition-colors relative overflow-hidden group">
             {image ? (
@@ -122,11 +136,13 @@ export default function WorkerApp() {
             ) : (
               <div className="flex flex-col items-center justify-center pt-5 pb-6">
                 <Camera className="w-8 h-8 text-gray-400 mb-2 group-hover:text-blue-500 transition-colors" />
-                <p className="text-sm text-gray-500 font-bold">Take "After" Photo</p>
+                <p className="text-sm text-gray-500 font-bold">{t('take_photo')}</p>
               </div>
             )}
             <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} />
           </label>
+
+
 
           <button
             onClick={verifyRepair}
@@ -136,7 +152,7 @@ export default function WorkerApp() {
             {isVerifying ? (
               <span className="animate-pulse">Uploading...</span>
             ) : (
-              <>Submit for Verification</>
+              <>{t('submit_verification')}</>
             )}
           </button>
         </motion.div>

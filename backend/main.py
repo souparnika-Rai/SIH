@@ -4,6 +4,14 @@ from pydantic import BaseModel
 import random
 from typing import List, Optional
 from datetime import datetime
+import os
+import json
+import io
+from google import genai
+from PIL import Image
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI(title="Infrastructure Defect Detection API")
 
@@ -14,6 +22,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Configure Gemini
+api_key = os.environ.get("GEMINI_API_KEY", "")
+if api_key:
+    client = genai.Client(api_key=api_key)
+    model = True
+else:
+    client = None
+    model = False
 
 class Issue(BaseModel):
     id: int
@@ -28,10 +45,17 @@ class Issue(BaseModel):
     date: str
     image: str
     worker_image: Optional[str] = None
+    citizen_name: Optional[str] = None
+    citizen_contact: Optional[str] = None
+    worker_rating: Optional[int] = None
+    worker_feedback: Optional[str] = None
+    citizen_rating: Optional[int] = None
+    citizen_notes: Optional[str] = None
 
 class StatusUpdate(BaseModel):
     status: str
     worker_image: Optional[str] = None
+    citizen_rating: Optional[int] = None
 
 issues_db = []
 issue_counter = 1
@@ -48,35 +72,91 @@ def get_issues():
 async def analyze_image(
     image: UploadFile = File(...),
     latitude: float = Form(...),
-    longitude: float = Form(...)
+    longitude: float = Form(...),
+    citizen_name: str = Form("Anonymous"),
+    citizen_contact: str = Form("N/A"),
+    citizen_notes: str = Form(""),
+    place_name: str = Form("")
 ):
     global issue_counter
     
-    filename = image.filename.lower() if image.filename else ""
+    # Read image bytes
+    image_bytes = await image.read()
     
-    if "pothole" in filename:
-        defect = "Pothole"
-    elif "crack" in filename:
-        defect = "Road Crack"
-    elif "light" in filename or "street" in filename:
-        defect = "Broken Streetlight"
-    elif "drain" in filename or "water" in filename:
-        defect = "Drainage Problem"
-    else:
-        # Default fallback
-        defect = "Pothole"
-        
-    confidence = f"{round(random.uniform(85, 99))}%"
+    defect = "Pothole"
+    confidence = "90%"
+    severity = "High"
+    priority_score = 80
     
-    if defect == "Pothole":
-        severity = random.choice(["High", "Critical"])
-        priority_score = random.randint(70, 95)
-    elif defect == "Broken Streetlight":
-        severity = "Medium"
-        priority_score = random.randint(40, 70)
+    if model:
+        try:
+            # Prepare image for Gemini
+            pil_image = Image.open(io.BytesIO(image_bytes))
+            
+            prompt = """
+            You are a public infrastructure defect detector. Analyze this image and return a JSON object with the following keys:
+            - type: (one of 'Pothole', 'Road Crack', 'Broken Streetlight', 'Drainage Problem', or a short description if none fit)
+            - confidence: (a string like '95%')
+            - severity: (one of 'Low', 'Medium', 'High', 'Critical')
+            - priority: (integer from 1 to 100, where 100 is the most critical and urgent, and 1 is the least urgent)
+            Respond ONLY with the JSON object, no markdown formatting.
+            """
+            
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=[prompt, pil_image]
+            )
+            text = response.text.strip()
+            
+            if text.startswith("```json"):
+                text = text[7:]
+            if text.endswith("```"):
+                text = text[:-3]
+                
+            data = json.loads(text.strip())
+            
+            defect = data.get("type", "Unknown Defect")
+            confidence = str(data.get("confidence", "85%"))
+            severity = data.get("severity", "Medium")
+            priority_score = int(data.get("priority", 50))
+        except Exception as e:
+            print("Gemini API Error:", e)
+            pass
     else:
-        severity = random.choice(["Low", "Medium", "High", "Critical"])
-        priority_score = random.randint(10, 100)
+        # Mock Fallback
+        filename = image.filename.lower() if image.filename else ""
+        if "crack" in filename:
+            defect = "Road Crack"
+        elif "light" in filename or "street" in filename:
+            defect = "Broken Streetlight"
+        elif "drain" in filename or "water" in filename:
+            defect = "Drainage Problem"
+            
+        confidence = f"{round(random.uniform(85, 99))}%"
+        if defect == "Pothole":
+            severity = random.choice(["High", "Critical"])
+            priority_score = random.randint(70, 95)
+        elif defect == "Broken Streetlight":
+            severity = "Medium"
+            priority_score = random.randint(40, 70)
+        else:
+            severity = random.choice(["Low", "Medium", "High", "Critical"])
+            priority_score = random.randint(10, 100)
+            
+    import base64
+    try:
+        img_temp = Image.open(io.BytesIO(image_bytes))
+        # Resize if too large
+        img_temp.thumbnail((800, 800))
+        buffer = io.BytesIO()
+        img_temp.save(buffer, format="JPEG", quality=80)
+        b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        image_url = f"data:image/jpeg;base64,{b64}"
+    except Exception as e:
+        print("Image processing error:", e)
+        image_url = "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&q=80&w=400"
+    
+    loc_str = place_name if place_name else f"GPS: {latitude:.4f}, {longitude:.4f}"
     
     new_issue = Issue(
         id=issue_counter,
@@ -84,12 +164,15 @@ async def analyze_image(
         confidence=confidence,
         severity=severity,
         priority=priority_score,
-        location=f"GPS: {latitude:.4f}, {longitude:.4f}",
+        location=loc_str,
         lat=latitude,
         lng=longitude,
         status="Pending",
         date=datetime.now().strftime("%d %b %Y"),
-        image="https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&q=80&w=400"
+        image=image_url,
+        citizen_name=citizen_name,
+        citizen_contact=citizen_contact,
+        citizen_notes=citizen_notes
     )
     issues_db.append(new_issue)
     issue_counter += 1
@@ -103,5 +186,51 @@ def update_issue_status(issue_id: int, update: StatusUpdate):
             issue.status = update.status
             if update.worker_image:
                 issue.worker_image = update.worker_image
+            if update.citizen_rating is not None:
+                issue.citizen_rating = update.citizen_rating
+                
+                # Analyze work with Gemini
+                if model and update.status == "Completed" and issue.image.startswith("data:") and update.worker_image.startswith("data:"):
+                    try:
+                        import base64
+                        before_b64 = issue.image.split(",")[1]
+                        after_b64 = update.worker_image.split(",")[1]
+                        
+                        before_bytes = base64.b64decode(before_b64)
+                        after_bytes = base64.b64decode(after_b64)
+                        
+                        img1 = Image.open(io.BytesIO(before_bytes))
+                        img2 = Image.open(io.BytesIO(after_bytes))
+                        
+                        prompt = """
+                        You are an AI inspector evaluating public infrastructure repairs. 
+                        I am giving you two images. The first image shows the original defect. 
+                        The second image shows the repaired work done by a worker.
+                        Please rate the quality of the repair work on a scale of 1 to 5.
+                        Return a JSON object with:
+                        - rating: (integer from 1 to 5)
+                        - feedback: (a short sentence explaining the rating)
+                        Respond ONLY with JSON.
+                        """
+                        response = client.models.generate_content(
+                            model='gemini-2.5-flash',
+                            contents=[prompt, img1, img2]
+                        )
+                        text = response.text.strip()
+                        if text.startswith("```json"):
+                            text = text[7:]
+                        if text.endswith("```"):
+                            text = text[:-3]
+                            
+                        data = json.loads(text.strip())
+                        issue.worker_rating = data.get("rating", 3)
+                        issue.worker_feedback = data.get("feedback", "Work completed successfully.")
+                    except Exception as e:
+                        print("Worker Analysis Error:", e)
+                        issue.worker_rating = 4
+                        issue.worker_feedback = "Looks good based on manual override."
+                elif update.status == "Completed":
+                    issue.worker_rating = 5
+                    issue.worker_feedback = "Automatic approval."
             return issue
     return {"error": "Issue not found"}

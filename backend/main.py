@@ -94,26 +94,24 @@ async def analyze_image(
             pil_image = Image.open(io.BytesIO(image_bytes))
             
             prompt = """
-            You are a public infrastructure defect detector. Analyze this image and return a JSON object with the following keys:
-            - type: (one of 'Pothole', 'Road Crack', 'Broken Streetlight', 'Drainage Problem', or a short description if none fit)
+            You are a public infrastructure defect detector. Analyze this image and identify the primary infrastructure or public issue.
+            Classify it into a clear, concise category such as 'Pothole', 'Road Crack', 'Broken Streetlight', 'Drainage Problem', 'Garbage Accumulation', 'Fallen Tree', 'Water Leak', 'Vandalism', etc. If it is something else, provide a 2-3 word description.
+            
+            Return a JSON object with the following keys:
+            - type: (the category or short description)
             - confidence: (a string like '95%')
             - severity: (one of 'Low', 'Medium', 'High', 'Critical')
-            - priority: (integer from 1 to 100, where 100 is the most critical and urgent, and 1 is the least urgent)
-            Respond ONLY with the JSON object, no markdown formatting.
+            - priority: (integer from 1 to 100, where 100 is the most critical and urgent)
             """
             
             response = client.models.generate_content(
                 model='gemini-2.5-flash',
-                contents=[prompt, pil_image]
+                contents=[prompt, pil_image],
+                config={"response_mime_type": "application/json"}
             )
             text = response.text.strip()
-            
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.endswith("```"):
-                text = text[:-3]
                 
-            data = json.loads(text.strip())
+            data = json.loads(text)
             
             defect = data.get("type", "Unknown Defect")
             confidence = str(data.get("confidence", "85%"))
@@ -121,7 +119,10 @@ async def analyze_image(
             priority_score = int(data.get("priority", 50))
         except Exception as e:
             print("Gemini API Error:", e)
-            pass
+            defect = "Error: Invalid API Key or Gemini API failure"
+            confidence = "0%"
+            severity = "Unknown"
+            priority_score = 0
     else:
         # Mock Fallback
         filename = image.filename.lower() if image.filename else ""
@@ -210,19 +211,15 @@ def update_issue_status(issue_id: int, update: StatusUpdate):
                         Return a JSON object with:
                         - rating: (integer from 1 to 5)
                         - feedback: (a short sentence explaining the rating)
-                        Respond ONLY with JSON.
                         """
                         response = client.models.generate_content(
                             model='gemini-2.5-flash',
-                            contents=[prompt, img1, img2]
+                            contents=[prompt, img1, img2],
+                            config={"response_mime_type": "application/json"}
                         )
                         text = response.text.strip()
-                        if text.startswith("```json"):
-                            text = text[7:]
-                        if text.endswith("```"):
-                            text = text[:-3]
                             
-                        data = json.loads(text.strip())
+                        data = json.loads(text)
                         issue.worker_rating = data.get("rating", 3)
                         issue.worker_feedback = data.get("feedback", "Work completed successfully.")
                     except Exception as e:

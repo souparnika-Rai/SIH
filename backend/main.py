@@ -51,11 +51,13 @@ class Issue(BaseModel):
     worker_feedback: Optional[str] = None
     citizen_rating: Optional[int] = None
     citizen_notes: Optional[str] = None
+    ward: Optional[str] = None
 
 class StatusUpdate(BaseModel):
     status: str
     worker_image: Optional[str] = None
     citizen_rating: Optional[int] = None
+    ward: Optional[str] = None
 
 issues_db = []
 issue_counter = 1
@@ -192,6 +194,8 @@ def update_issue_status(issue_id: int, update: StatusUpdate):
     for issue in issues_db:
         if issue.id == issue_id:
             issue.status = update.status
+            if update.ward is not None:
+                issue.ward = update.ward
             if update.worker_image:
                 issue.worker_image = update.worker_image
             if update.citizen_rating is not None:

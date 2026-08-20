@@ -12,6 +12,7 @@ export default function AdminDashboard() {
   const [issues, setIssues] = useState([]);
   const [toast, setToast] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
+  const [wardSelections, setWardSelections] = useState({});
 
   useEffect(() => {
     fetchIssues();
@@ -34,12 +35,15 @@ export default function AdminDashboard() {
     }
   };
 
-  const updateStatus = async (issueId, newStatus) => {
+  const updateStatus = async (issueId, newStatus, ward = null) => {
     try {
+      const payload = { status: newStatus };
+      if (ward) payload.ward = ward;
+
       await fetch(`http://127.0.0.1:8000/issues/${issueId}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(payload),
       });
       fetchIssues();
       
@@ -296,9 +300,28 @@ export default function AdminDashboard() {
                           </span>
                           
                           {selectedIssue.status === 'Pending' && (
-                            <button onClick={() => updateStatus(selectedIssue.id, 'Assigning')} className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">
-                              <Navigation className="w-3 h-3" /> {t('assign_worker')}
-                            </button>
+                            <div className="flex flex-col items-end gap-2">
+                              <select 
+                                className="text-xs border rounded p-1 bg-gray-50 outline-none"
+                                value={wardSelections[selectedIssue.id] || ''}
+                                onChange={(e) => setWardSelections({...wardSelections, [selectedIssue.id]: e.target.value})}
+                              >
+                                <option value="" disabled>Select Ward/Dept</option>
+                                <option value="Ward A (Central)">Ward A (Central)</option>
+                                <option value="Ward B (North)">Ward B (North)</option>
+                                <option value="Ward C (East)">Ward C (East)</option>
+                                <option value="Ward D (South)">Ward D (South)</option>
+                                <option value="Roads Dept">Roads Dept</option>
+                                <option value="Water Dept">Water Dept</option>
+                                <option value="Electrical Dept">Electrical Dept</option>
+                              </select>
+                              <button onClick={() => {
+                                if (!wardSelections[selectedIssue.id]) { alert("Please select a ward/department first."); return; }
+                                updateStatus(selectedIssue.id, 'Assigning', wardSelections[selectedIssue.id]);
+                              }} className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">
+                                <Navigation className="w-3 h-3" /> {t('assign_worker')}
+                              </button>
+                            </div>
                           )}
                           
                           {selectedIssue.status === 'Declined' && (
@@ -344,7 +367,26 @@ export default function AdminDashboard() {
                       <td className="p-4 font-bold text-gray-600">{issue.priority}/100</td>
                       <td className="p-4">
                         {issue.status === 'Pending' ? (
-                          <button onClick={() => updateStatus(issue.id, 'Assigning')} className="text-sm text-blue-600 font-bold hover:text-blue-800">{t('assign_work')}</button>
+                          <div className="flex flex-col gap-1 items-start">
+                            <select 
+                              className="text-xs border rounded p-1 bg-gray-50 outline-none w-full"
+                              value={wardSelections[issue.id] || ''}
+                              onChange={(e) => setWardSelections({...wardSelections, [issue.id]: e.target.value})}
+                            >
+                              <option value="" disabled>Select Ward/Dept</option>
+                              <option value="Ward A (Central)">Ward A (Central)</option>
+                              <option value="Ward B (North)">Ward B (North)</option>
+                              <option value="Ward C (East)">Ward C (East)</option>
+                              <option value="Ward D (South)">Ward D (South)</option>
+                              <option value="Roads Dept">Roads Dept</option>
+                              <option value="Water Dept">Water Dept</option>
+                              <option value="Electrical Dept">Electrical Dept</option>
+                            </select>
+                            <button onClick={() => {
+                              if (!wardSelections[issue.id]) { alert("Please select a ward/department first."); return; }
+                              updateStatus(issue.id, 'Assigning', wardSelections[issue.id]);
+                            }} className="text-xs bg-blue-50 text-blue-600 font-bold hover:bg-blue-100 px-2 py-1 rounded w-full">{t('assign_work')}</button>
+                          </div>
                         ) : issue.status === 'Declined' ? (
                           <button onClick={() => updateStatus(issue.id, 'Assigning')} className="text-sm text-orange-600 font-bold hover:text-orange-800">{t('reassign')}</button>
                         ) : (

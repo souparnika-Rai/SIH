@@ -98,8 +98,15 @@ export default function WorkerApp() {
           <span className="bg-red-600 text-white text-[10px] uppercase px-2 py-1 rounded font-bold">{t(task.severity.toLowerCase()) || task.severity}</span>
         </div>
         
-        <div className="flex items-center gap-2 text-red-900/80 text-sm mb-6 font-medium">
-          <MapPin className="w-4 h-4" /> {task.location}
+        <div className="flex flex-col gap-1 mb-6">
+          <div className="flex items-center gap-2 text-red-900/80 text-sm font-medium">
+            <MapPin className="w-4 h-4" /> {task.location}
+          </div>
+          {task.ward && (
+            <div className="text-red-800 text-xs font-bold bg-red-100 px-2 py-1 rounded w-fit">
+              Dept/Ward: {task.ward}
+            </div>
+          )}
         </div>
 
         {task.status === 'Assigning' ? (

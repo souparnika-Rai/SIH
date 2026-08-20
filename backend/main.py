@@ -107,7 +107,7 @@ async def analyze_image(
             """
             
             response = client.models.generate_content(
-                model='gemini-1.5-flash',
+                model='gemini-flash-latest',
                 contents=[prompt, pil_image],
                 config={"response_mime_type": "application/json"}
             )
@@ -224,7 +224,7 @@ def update_issue_status(issue_id: int, update: StatusUpdate):
                         - feedback: (a short sentence explaining the rating)
                         """
                         response = client.models.generate_content(
-                            model='gemini-1.5-flash',
+                            model='gemini-flash-latest',
                             contents=[prompt, img1, img2],
                             config={"response_mime_type": "application/json"}
                         )

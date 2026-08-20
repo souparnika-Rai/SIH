@@ -13,6 +13,7 @@ export default function AdminDashboard() {
   const [toast, setToast] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
   const [wardSelections, setWardSelections] = useState({});
+  const [assigningIssueId, setAssigningIssueId] = useState(null);
 
   useEffect(() => {
     fetchIssues();
@@ -306,32 +307,15 @@ export default function AdminDashboard() {
                           </span>
                           
                           {(selectedIssue.status === 'Pending' || selectedIssue.status === 'Assigning' || selectedIssue.status === 'Declined') && (
-                            <div className="flex flex-col items-end gap-2">
-                              <select 
-                                className="text-xs border rounded p-1 bg-gray-50 outline-none"
-                                value={wardSelections[selectedIssue.id] || ''}
-                                onChange={(e) => setWardSelections({...wardSelections, [selectedIssue.id]: e.target.value})}
-                              >
-                                <option value="" disabled>Select Ward/Dept</option>
-                                <option value="Ward A (Central)">Ward A (Central)</option>
-                                <option value="Ward B (North)">Ward B (North)</option>
-                                <option value="Ward C (East)">Ward C (East)</option>
-                                <option value="Ward D (South)">Ward D (South)</option>
-                                <option value="Roads Dept">Roads Dept</option>
-                                <option value="Water Dept">Water Dept</option>
-                                <option value="Electrical Dept">Electrical Dept</option>
-                              </select>
-                              <div className="flex gap-2">
-                                {selectedIssue.status === 'Declined' && (
-                                  <button onClick={() => updateStatus(selectedIssue.id, 'Resolved')} className="text-xs font-bold text-green-600 hover:bg-green-50 border border-green-200 px-2 py-1.5 rounded-md">Force Close</button>
-                                )}
-                                <button onClick={() => {
-                                  if (!wardSelections[selectedIssue.id]) { alert("Please select a ward/department first."); return; }
-                                  updateStatus(selectedIssue.id, 'Assigning', wardSelections[selectedIssue.id]);
-                                }} className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">
-                                  <Navigation className="w-3 h-3" /> {selectedIssue.status === 'Pending' ? t('assign_worker') : t('reassign') || 'Reassign'}
-                                </button>
-                              </div>
+                            <div className="flex gap-2">
+                              {selectedIssue.status === 'Declined' && (
+                                <button onClick={() => updateStatus(selectedIssue.id, 'Resolved')} className="text-xs font-bold text-green-600 hover:bg-green-50 border border-green-200 px-2 py-1.5 rounded-md">Force Close</button>
+                              )}
+                              <button onClick={() => {
+                                setAssigningIssueId(selectedIssue.id);
+                              }} className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">
+                                <Navigation className="w-3 h-3" /> {selectedIssue.status === 'Pending' ? t('assign_worker') : t('reassign') || 'Reassign'}
+                              </button>
                             </div>
                           )}
                         </div>
@@ -377,23 +361,8 @@ export default function AdminDashboard() {
                         )}
                         {(issue.status === 'Pending' || issue.status === 'Assigning' || issue.status === 'Declined') ? (
                           <div className="flex flex-col gap-1 items-start w-full">
-                            <select 
-                              className="text-xs border rounded p-1 bg-gray-50 outline-none w-full"
-                              value={wardSelections[issue.id] || ''}
-                              onChange={(e) => setWardSelections({...wardSelections, [issue.id]: e.target.value})}
-                            >
-                              <option value="" disabled>Select Ward/Dept</option>
-                              <option value="Ward A (Central)">Ward A (Central)</option>
-                              <option value="Ward B (North)">Ward B (North)</option>
-                              <option value="Ward C (East)">Ward C (East)</option>
-                              <option value="Ward D (South)">Ward D (South)</option>
-                              <option value="Roads Dept">Roads Dept</option>
-                              <option value="Water Dept">Water Dept</option>
-                              <option value="Electrical Dept">Electrical Dept</option>
-                            </select>
                             <button onClick={() => {
-                              if (!wardSelections[issue.id]) { alert("Please select a ward/department first."); return; }
-                              updateStatus(issue.id, 'Assigning', wardSelections[issue.id]);
+                              setAssigningIssueId(issue.id);
                             }} className="text-xs bg-blue-50 text-blue-600 font-bold hover:bg-blue-100 px-2 py-1 rounded w-full">
                               {issue.status === 'Pending' ? t('assign_work') : t('reassign') || 'Reassign'}
                             </button>
@@ -413,6 +382,75 @@ export default function AdminDashboard() {
           </div>
         )}
       </div>
+      {/* Assignment Modal */}
+      <AnimatePresence>
+        {assigningIssueId && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm"
+            onClick={() => setAssigningIssueId(null)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg"
+              onClick={e => e.stopPropagation()}
+            >
+              <h3 className="text-xl font-extrabold text-gray-900 mb-2">Assign Work</h3>
+              <p className="text-sm text-gray-500 mb-6">Select the appropriate department or ward category to handle this issue.</p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Department / Category</label>
+                  <select 
+                    className="w-full border-2 border-gray-200 rounded-xl p-3 bg-gray-50 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-sm font-medium"
+                    value={wardSelections[assigningIssueId] || ''}
+                    onChange={(e) => setWardSelections({...wardSelections, [assigningIssueId]: e.target.value})}
+                  >
+                    <option value="" disabled>Select a category...</option>
+                    <option value="Roads & Bridges">Potholes, road cracks, damaged roads, footpaths, bridges</option>
+                    <option value="Electrical">Broken/non-working streetlights, damaged electrical infrastructure</option>
+                    <option value="Drainage & Sewage">Blocked drains, damaged drains, sewage overflow, waterlogging</option>
+                    <option value="Water Supply">Water leakage, broken pipelines, damaged public taps</option>
+                    <option value="Waste Management">Garbage accumulation, overflowing bins, illegal dumping</option>
+                    <option value="Public Sanitation">Dirty areas, sanitation issues, public toilets</option>
+                    <option value="Parks & Forestry">Damaged parks, fallen trees/branches, damaged greenery</option>
+                    <option value="Public Facilities">Damaged government buildings, bus shelters, public facilities</option>
+                    <option value="Traffic & Safety">Damaged traffic signs, signals, road markings</option>
+                    <option value="Town Planning">Illegal construction, building-related civic issues</option>
+                    <option value="Stormwater Drainage">Flooding, waterlogging, inadequate rainwater drainage</option>
+                    <option value="Public Transport">Damaged bus stops, shelters, public transport infrastructure</option>
+                    <option value="Miscellaneous">Issues that don't fit another category</option>
+                  </select>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4 border-t mt-6">
+                  <button 
+                    onClick={() => setAssigningIssueId(null)}
+                    className="px-4 py-2 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-100 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (!wardSelections[assigningIssueId]) { alert("Please select a category first."); return; }
+                      updateStatus(assigningIssueId, 'Assigning', wardSelections[assigningIssueId]);
+                      setAssigningIssueId(null);
+                    }}
+                    className="px-6 py-2 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md transition-colors"
+                  >
+                    Confirm Assignment
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

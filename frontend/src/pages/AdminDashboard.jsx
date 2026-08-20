@@ -293,13 +293,19 @@ export default function AdminDashboard() {
                             <strong>Notes:</strong> {selectedIssue.citizen_notes}
                           </div>
                         )}
+
+                        {selectedIssue.ward && (
+                          <div className="mt-2 text-xs bg-blue-50 p-2 rounded border border-blue-100 text-blue-800 font-semibold">
+                            Assigned To: {selectedIssue.ward}
+                          </div>
+                        )}
                         
                         <div className="flex justify-between items-center mt-4 border-t pt-3">
                           <span className="text-xs font-semibold px-2.5 py-1 rounded-full text-white" style={{ backgroundColor: getMarkerColor(selectedIssue.status, selectedIssue.severity) }}>
                             {t(selectedIssue.status.toLowerCase()) || selectedIssue.status}
                           </span>
                           
-                          {selectedIssue.status === 'Pending' && (
+                          {(selectedIssue.status === 'Pending' || selectedIssue.status === 'Assigning' || selectedIssue.status === 'Declined') && (
                             <div className="flex flex-col items-end gap-2">
                               <select 
                                 className="text-xs border rounded p-1 bg-gray-50 outline-none"
@@ -315,19 +321,17 @@ export default function AdminDashboard() {
                                 <option value="Water Dept">Water Dept</option>
                                 <option value="Electrical Dept">Electrical Dept</option>
                               </select>
-                              <button onClick={() => {
-                                if (!wardSelections[selectedIssue.id]) { alert("Please select a ward/department first."); return; }
-                                updateStatus(selectedIssue.id, 'Assigning', wardSelections[selectedIssue.id]);
-                              }} className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">
-                                <Navigation className="w-3 h-3" /> {t('assign_worker')}
-                              </button>
-                            </div>
-                          )}
-                          
-                          {selectedIssue.status === 'Declined' && (
-                            <div className="flex gap-2">
-                              <button onClick={() => updateStatus(selectedIssue.id, 'Resolved')} className="text-xs font-bold text-green-600 hover:bg-green-50 border border-green-200 px-2 py-1.5 rounded-md">Force Close</button>
-                              <button onClick={() => updateStatus(selectedIssue.id, 'Assigning')} className="text-xs font-bold text-blue-600 hover:bg-blue-50 border border-blue-200 px-2 py-1.5 rounded-md">{t('reassign')}</button>
+                              <div className="flex gap-2">
+                                {selectedIssue.status === 'Declined' && (
+                                  <button onClick={() => updateStatus(selectedIssue.id, 'Resolved')} className="text-xs font-bold text-green-600 hover:bg-green-50 border border-green-200 px-2 py-1.5 rounded-md">Force Close</button>
+                                )}
+                                <button onClick={() => {
+                                  if (!wardSelections[selectedIssue.id]) { alert("Please select a ward/department first."); return; }
+                                  updateStatus(selectedIssue.id, 'Assigning', wardSelections[selectedIssue.id]);
+                                }} className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">
+                                  <Navigation className="w-3 h-3" /> {selectedIssue.status === 'Pending' ? t('assign_worker') : t('reassign') || 'Reassign'}
+                                </button>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -365,9 +369,14 @@ export default function AdminDashboard() {
                         </span>
                       </td>
                       <td className="p-4 font-bold text-gray-600">{issue.priority}/100</td>
-                      <td className="p-4">
-                        {issue.status === 'Pending' ? (
-                          <div className="flex flex-col gap-1 items-start">
+                      <td className="p-4 align-top">
+                        {issue.ward && (
+                           <div className="text-[10px] bg-blue-50 text-blue-800 font-semibold px-2 py-0.5 rounded-full mb-2 w-max border border-blue-100">
+                             {issue.ward}
+                           </div>
+                        )}
+                        {(issue.status === 'Pending' || issue.status === 'Assigning' || issue.status === 'Declined') ? (
+                          <div className="flex flex-col gap-1 items-start w-full">
                             <select 
                               className="text-xs border rounded p-1 bg-gray-50 outline-none w-full"
                               value={wardSelections[issue.id] || ''}
@@ -385,10 +394,10 @@ export default function AdminDashboard() {
                             <button onClick={() => {
                               if (!wardSelections[issue.id]) { alert("Please select a ward/department first."); return; }
                               updateStatus(issue.id, 'Assigning', wardSelections[issue.id]);
-                            }} className="text-xs bg-blue-50 text-blue-600 font-bold hover:bg-blue-100 px-2 py-1 rounded w-full">{t('assign_work')}</button>
+                            }} className="text-xs bg-blue-50 text-blue-600 font-bold hover:bg-blue-100 px-2 py-1 rounded w-full">
+                              {issue.status === 'Pending' ? t('assign_work') : t('reassign') || 'Reassign'}
+                            </button>
                           </div>
-                        ) : issue.status === 'Declined' ? (
-                          <button onClick={() => updateStatus(issue.id, 'Assigning')} className="text-sm text-orange-600 font-bold hover:text-orange-800">{t('reassign')}</button>
                         ) : (
                           <span className="text-sm text-gray-400 font-bold">-</span>
                         )}

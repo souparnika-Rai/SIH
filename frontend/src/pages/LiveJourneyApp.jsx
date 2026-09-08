@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Map, { Marker, Source, Layer } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { Camera, MapPin, Bus, Play, Square, AlertTriangle } from 'lucide-react';
+import { Bus, Play, Square, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const defaultLocation = { lat: 12.9716, lng: 77.5946 };
 
 export default function LiveJourneyApp() {
   const [isLive, setIsLive] = useState(false);
@@ -17,9 +19,6 @@ export default function LiveJourneyApp() {
   const watchIdRef = useRef(null);
   const intervalRef = useRef(null);
   const lastReportTimeRef = useRef(0);
-
-  // Default to Bangalore
-  const defaultLocation = { lat: 12.9716, lng: 77.5946 };
 
   useEffect(() => {
     // Initial location grab
@@ -46,7 +45,8 @@ export default function LiveJourneyApp() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
-    } catch (e) {
+    } catch (err) {
+      console.error(err);
       alert("Could not access camera");
       setIsLive(false);
       return;

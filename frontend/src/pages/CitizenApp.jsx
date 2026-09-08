@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, MapPin, Upload, CheckCircle, XCircle, Info, User, Phone, Star, Search, List, ChevronLeft } from 'lucide-react';
+import { Camera, MapPin, Upload, CheckCircle, XCircle, Info, User, Phone, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import Map, { Marker } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 export default function CitizenApp() {
@@ -28,7 +27,7 @@ export default function CitizenApp() {
   const [myReportsList, setMyReportsList] = useState([]);
   
   const videoRef = useRef(null);
-  const mapRef = useRef(null);
+
   const [isCameraOpen, setIsCameraOpen] = useState(false);
 
   const handleNewIssue = () => {
@@ -72,23 +71,7 @@ export default function CitizenApp() {
     }
   };
 
-  const fetchCoordinates = async (address) => {
-    if (!address) return;
-    try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
-      const data = await res.json();
-      if (data && data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lng = parseFloat(data[0].lon);
-        setLocation({ lat, lng });
-        if (mapRef.current) {
-          mapRef.current.flyTo({ center: [lng, lat], zoom: 14 });
-        }
-      }
-    } catch (e) {
-      console.error("Geocoding error:", e);
-    }
-  };
+
 
   const startCamera = async () => {
     try {
@@ -314,24 +297,7 @@ export default function CitizenApp() {
     }
   };
 
-  const updateStatus = async (newStatus) => {
-    try {
-      await fetch(`http://127.0.0.1:8000/issues/${activeIssue.id}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          status: newStatus,
-          citizen_rating: citizenRating > 0 ? citizenRating : undefined
-        }),
-      });
-      setActiveIssue(prev => ({ ...prev, status: newStatus }));
-      setToast(t('issue_closed_success') || 'Status updated!');
-      setTimeout(() => setToast(null), 3000);
-    } catch (e) {
-      console.error(e);
-      alert("Failed to update status.");
-    }
-  };
+
 
   return (
     <div className="flex h-[calc(100vh-64px)] bg-gray-50 overflow-hidden relative">

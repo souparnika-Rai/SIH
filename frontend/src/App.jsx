@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import CitizenApp from './pages/CitizenApp';
 import AdminDashboard from './pages/AdminDashboard';
 import WorkerApp from './pages/WorkerApp';
+import LiveJourneyApp from './pages/LiveJourneyApp';
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -26,6 +27,13 @@ function App() {
                 <Link to="/" className="text-gray-600 hover:text-blue-600 font-medium">{t('nav_citizen')}</Link>
                 <Link to="/admin" className="text-gray-600 hover:text-blue-600 font-medium">{t('nav_admin')}</Link>
                 <Link to="/worker" className="text-gray-600 hover:text-blue-600 font-medium">{t('nav_worker')}</Link>
+                <Link to="/live" className="text-red-500 hover:text-red-600 font-bold flex items-center gap-1">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                  </span>
+                  Live
+                </Link>
               </div>
               <select 
                 onChange={changeLanguage} 
@@ -48,6 +56,7 @@ function App() {
             <Route path="/" element={<CitizenApp />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/worker" element={<WorkerApp />} />
+            <Route path="/live" element={<LiveJourneyApp />} />
           </Routes>
         </main>
       </div>

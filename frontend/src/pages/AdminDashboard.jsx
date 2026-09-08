@@ -15,6 +15,9 @@ export default function AdminDashboard() {
   const [wardSelections, setWardSelections] = useState({});
   const [assigningIssueId, setAssigningIssueId] = useState(null);
 
+  const [trafficData, setTrafficData] = useState([]);
+  const [anprAlerts, setAnprAlerts] = useState([]);
+
   useEffect(() => {
     fetchIssues();
     const interval = setInterval(fetchIssues, 3000);
@@ -23,13 +26,23 @@ export default function AdminDashboard() {
 
   const fetchIssues = async () => {
     try {
-      const response = await fetch("http://127.0.0.1:8000/issues");
-      if (!response.ok) return;
-      const data = await response.json();
-      if (Array.isArray(data)) {
-        setIssues(data);
-        // Update selected issue data if it's currently open
-        setSelectedIssue(current => data.find(i => i.id === current?.id) || current);
+      const response = await fetch(`http://${window.location.hostname}:8000/issues`);
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          setIssues(data);
+          setSelectedIssue(current => data.find(i => i.id === current?.id) || current);
+        }
+      }
+      
+      const trafficRes = await fetch(`http://${window.location.hostname}:8000/traffic-data`);
+      if (trafficRes.ok) {
+        setTrafficData(await trafficRes.json());
+      }
+      
+      const anprRes = await fetch(`http://${window.location.hostname}:8000/anpr-alerts`);
+      if (anprRes.ok) {
+        setAnprAlerts(await anprRes.json());
       }
     } catch (error) {
       console.error("Error fetching issues:", error);
@@ -41,7 +54,7 @@ export default function AdminDashboard() {
       const payload = { status: newStatus };
       if (ward) payload.ward = ward;
 
-      await fetch(`http://127.0.0.1:8000/issues/${issueId}/status`, {
+      await fetch(`http://${window.location.hostname}:8000/issues/${issueId}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -255,6 +268,28 @@ export default function AdminDashboard() {
                 </Marker>
               ))}
 
+              {trafficData.map((t, idx) => (
+                <Marker key={`traffic-${idx}`} longitude={t.lng} latitude={t.lat} anchor="center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center opacity-70 shadow-lg border-2 border-white`}
+                       style={{ backgroundColor: t.congestion_level === 'High' ? '#ef4444' : '#22c55e' }}>
+                    <Navigation className="w-4 h-4 text-white" />
+                  </div>
+                </Marker>
+              ))}
+
+              {anprAlerts.map((a, idx) => (
+                <Marker key={`anpr-${idx}`} longitude={a.lng} latitude={a.lat} anchor="center">
+                  <div className={`w-4 h-4 rounded-full border border-white shadow-md cursor-help`}
+                       style={{ backgroundColor: a.report_count >= 10 ? '#ef4444' : '#22c55e' }}
+                       title={`ANPR: ${a.license_plate} (Reports: ${a.report_count})`}
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         alert(`This is an automated ANPR (License Plate) detection from the bus camera.\n\nLicense: ${a.license_plate}\nTimes Detected: ${a.report_count}\n\nTo assign work for infrastructure issues (like potholes), click the larger markers with the Alert icon.`);
+                       }}>
+                  </div>
+                </Marker>
+              ))}
+
               <AnimatePresence>
                 {selectedIssue && displayedIssues.find(i => i.id === selectedIssue.id) && (
                   <Popup
@@ -314,7 +349,7 @@ export default function AdminDashboard() {
                               <button onClick={() => {
                                 setAssigningIssueId(selectedIssue.id);
                               }} className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">
-                                <Navigation className="w-3 h-3" /> {selectedIssue.status === 'Pending' ? t('assign_worker') : t('reassign') || 'Reassign'}
+                                <Navigation className="w-3 h-3" /> {selectedIssue.status === 'Pending' ? (t('assign_worker') || 'Assign Work') : (t('reassign') || 'Reassign')}
                               </button>
                             </div>
                           )}
@@ -337,6 +372,7 @@ export default function AdminDashboard() {
                   <tr>
                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('id_table')}</th>
                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('defect_table')}</th>
+                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Reporter</th>
                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('status')}</th>
                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('priority')}</th>
                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('action_table')}</th>
@@ -347,6 +383,10 @@ export default function AdminDashboard() {
                     <tr key={issue.id} className="hover:bg-blue-50/50 transition-colors">
                       <td className="p-4 text-gray-500 text-sm font-medium">#{issue.id}</td>
                       <td className="p-4 font-bold text-gray-900 text-sm">{t(issue.type.toLowerCase().replace(' ', '_')) || issue.type}</td>
+                      <td className="p-4 text-sm">
+                        <div className="font-bold text-gray-900">{issue.citizen_name || 'Anonymous'}</div>
+                        <div className="text-gray-500 text-xs">{issue.citizen_contact || 'N/A'}</div>
+                      </td>
                       <td className="p-4">
                         <span className="px-2.5 py-1 rounded-md text-xs font-bold text-white shadow-sm" style={{ backgroundColor: getMarkerColor(issue.status, issue.severity) }}>
                           {t(issue.status.toLowerCase()) || issue.status}

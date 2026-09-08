@@ -14,7 +14,7 @@ export default function WorkerApp() {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/issues");
+        const res = await fetch(`http://${window.location.hostname}:8000/issues`);
         if (!res.ok) return;
         const data = await res.json();
         if (Array.isArray(data)) {
@@ -46,7 +46,7 @@ export default function WorkerApp() {
   const updateTaskStatus = async (newStatus, workerImage = null) => {
     if (!task) return;
     try {
-      await fetch(`http://127.0.0.1:8000/issues/${task.id}/status`, {
+      await fetch(`http://${window.location.hostname}:8000/issues/${task.id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 

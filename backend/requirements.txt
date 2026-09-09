@@ -5,3 +5,5 @@ python-multipart
 google-genai
 pillow
 python-dotenv
+opencv-python
+ultralytics

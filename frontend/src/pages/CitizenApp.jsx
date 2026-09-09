@@ -93,7 +93,7 @@ export default function CitizenApp() {
   const handleVerifyWorker = async (newStatus) => {
     if (!activeIssue) return;
     try {
-      await fetch(`http://127.0.0.1:8000/issues/${activeIssue.id}/status`, {
+      await fetch(`http://${window.location.hostname}:8000/issues/${activeIssue.id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus })
@@ -146,7 +146,7 @@ export default function CitizenApp() {
     const pollData = async () => {
       try {
         const saved = JSON.parse(localStorage.getItem('my_reports') || '[]');
-        const res = await fetch("http://127.0.0.1:8000/issues");
+        const res = await fetch(`http://${window.location.hostname}:8000/issues`);
         if (!res.ok || !isActive) return;
         const data = await res.json();
         if (Array.isArray(data) && isActive) {
@@ -219,7 +219,7 @@ export default function CitizenApp() {
     formData.append("video", file);
     
     try {
-      const response = await fetch("http://127.0.0.1:8000/process-video", {
+      const response = await fetch(`http://${window.location.hostname}:8000/process-video`, {
         method: "POST",
         body: formData,
       });
@@ -277,7 +277,7 @@ export default function CitizenApp() {
     }
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/analyze", {
+      const response = await fetch(`http://${window.location.hostname}:8000/analyze`, {
         method: "POST",
         body: formData,
       });

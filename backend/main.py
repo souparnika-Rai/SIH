@@ -72,6 +72,9 @@ class StatusUpdate(BaseModel):
     citizen_rating: Optional[int] = None
     ward: Optional[str] = None
 
+class VerifyRepairRequest(BaseModel):
+    worker_image: str
+
 class EdgeDefect(BaseModel):
     type: str
     severity: str
@@ -292,6 +295,60 @@ def update_issue_status(issue_id: int, update: StatusUpdate):
             return issue
     return {"error": "Issue not found"}
 
+@app.post("/issues/{issue_id}/verify-repair")
+def verify_repair_image(issue_id: int, request: VerifyRepairRequest):
+    target_issue = None
+    for issue in issues_db:
+        if issue.id == issue_id:
+            target_issue = issue
+            break
+            
+    if not target_issue:
+        return {"error": "Issue not found"}
+        
+    if not model or not target_issue.image.startswith("data:") or not request.worker_image.startswith("data:"):
+         return {"is_duplicate": False, "is_solved": True, "message": "Cannot verify using AI."}
+         
+    try:
+        import base64
+        before_b64 = target_issue.image.split(",")[1]
+        after_b64 = request.worker_image.split(",")[1]
+        
+        before_bytes = base64.b64decode(before_b64)
+        after_bytes = base64.b64decode(after_b64)
+        
+        img1 = Image.open(io.BytesIO(before_bytes))
+        img2 = Image.open(io.BytesIO(after_bytes))
+        
+        prompt = """
+        You are an AI inspector evaluating public infrastructure repairs. I am giving you two images.
+        Image 1: The original defect.
+        Image 2: The repaired work done by a worker.
+        
+        First, check if Image 2 is exactly the same as Image 1 (a duplicate upload) or just a cropped/slightly rotated version of the exact same photo.
+        Second, if it's not a duplicate, check if the defect shown in Image 1 appears to be repaired in Image 2.
+        
+        Return a JSON object with:
+        - is_duplicate: (boolean) true if the images are exactly the same photo, false otherwise
+        - is_solved: (boolean) true if the defect appears repaired in the second image, false otherwise
+        - message: (string) short feedback explaining your decision. If duplicate, say "Duplicate image".
+        """
+        response = client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=[prompt, img1, img2],
+            config={"response_mime_type": "application/json"}
+        )
+        text = response.text.strip()
+        data = json.loads(text)
+        return {
+            "is_duplicate": data.get("is_duplicate", False),
+            "is_solved": data.get("is_solved", True),
+            "message": data.get("message", "")
+        }
+    except Exception as e:
+        print("Verify Repair Error:", e)
+        return {"is_duplicate": False, "is_solved": True, "message": "Error analyzing image."}
+
 traffic_db = []
 anpr_db = []
 
@@ -477,3 +534,7 @@ def receive_anpr_alert(alert: ANPRAlert):
 @app.get("/anpr-alerts")
 def get_anpr_alerts():
     return anpr_db
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

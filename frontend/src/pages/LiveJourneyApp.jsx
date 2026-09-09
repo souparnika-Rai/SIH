@@ -30,7 +30,18 @@ export default function LiveJourneyApp() {
     } else {
       setLocation(defaultLocation);
     }
-    return () => stopJourney();
+    
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+      if (videoRef.current && videoRef.current.srcObject) {
+        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
   }, []);
 
   const startJourney = async () => {
@@ -115,7 +126,7 @@ export default function LiveJourneyApp() {
 
     try {
       // 1. Detect
-      const detectRes = await fetch("http://127.0.0.1:8000/detect-frame", {
+      const detectRes = await fetch(`http://${window.location.hostname}:8000/detect-frame`, {
         method: "POST",
         body: formData
       });
@@ -168,7 +179,7 @@ export default function LiveJourneyApp() {
         submitData.append("citizen_name", "Live Journey Tracker");
         submitData.append("skip_analysis", "true"); // Bypass gemini
         
-        await fetch("http://127.0.0.1:8000/analyze", {
+        await fetch(`http://${window.location.hostname}:8000/analyze`, {
           method: "POST",
           body: submitData
         });

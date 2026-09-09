@@ -334,7 +334,7 @@ def verify_repair_image(issue_id: int, request: VerifyRepairRequest):
         - message: (string) short feedback explaining your decision. If duplicate, say "Duplicate image".
         """
         response = client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-2.5-flash',
             contents=[prompt, img1, img2],
             config={"response_mime_type": "application/json"}
         )
@@ -347,7 +347,7 @@ def verify_repair_image(issue_id: int, request: VerifyRepairRequest):
         }
     except Exception as e:
         print("Verify Repair Error:", e)
-        return {"is_duplicate": False, "is_solved": True, "message": "Error analyzing image."}
+        return {"is_duplicate": False, "is_solved": False, "message": f"AI Error: {str(e)}" }
 
 traffic_db = []
 anpr_db = []
